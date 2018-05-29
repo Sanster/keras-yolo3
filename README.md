@@ -43,6 +43,38 @@ For Tiny YOLOv3, just do in the similar way. And modify model path and anchor pa
 
 ---
 
+## Run on COCO test dataset
+Clone cocoapi:
+```
+cd coco
+git clone https://github.com/cocodataset/cocoapi.git
+```
+
+Install coco python api:
+```
+cd cocoapi/PythonAPI
+make
+sudo make install
+sudo python setup.py install
+```
+
+Download COCO Dataset and annotations data. Extract images and annotations in save folder,
+for example
+```
+/tmp/COCO/annotations
+    /tmp/COCO/annotations/image_info_test-dev2017.json
+    ...
+
+/tmp/COCO/test2017
+```
+
+
+Run
+
+```
+yolo_coco.py --coco_dir=/tmp/COCO --dataset=test2017
+```
+
 ## Some issues to know
 
 1. The test environment is

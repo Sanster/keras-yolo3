@@ -18,9 +18,10 @@ from PIL import Image, ImageFont, ImageDraw
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
 
+
 class YOLO(object):
     def __init__(self):
-        self.model_path = 'model_data/yolo.h5' # model path or trained weights path
+        self.model_path = 'model_data/yolo.h5'  # model path or trained weights path
         self.anchors_path = 'model_data/yolo_anchors.txt'
         self.classes_path = 'model_data/coco_classes.txt'
         self.score = 0.3
@@ -28,7 +29,7 @@ class YOLO(object):
         self.class_names = self._get_class()
         self.anchors = self._get_anchors()
         self.sess = K.get_session()
-        self.model_image_size = (416, 416) # fixed size or (None, None), hw
+        self.model_image_size = (416, 416)  # fixed size or (None, None), hw
         self.boxes, self.scores, self.classes = self.generate()
 
     def _get_class(self):
@@ -52,19 +53,19 @@ class YOLO(object):
         # Load model, or construct model and load weights.
         num_anchors = len(self.anchors)
         num_classes = len(self.class_names)
-        is_tiny_version = num_anchors==6 # default setting
+        is_tiny_version = num_anchors == 6  # default setting
         try:
             self.yolo_model = load_model(model_path, compile=False)
         except:
-            self.yolo_model = tiny_yolo_body(Input(shape=(None,None,3)), num_anchors//2, num_classes) \
-                if is_tiny_version else yolo_body(Input(shape=(None,None,3)), num_anchors//3, num_classes)
-            self.yolo_model.load_weights(self.model_path) # make sure model, anchors and classes match
+            self.yolo_model = tiny_yolo_body(Input(shape=(None, None, 3)), num_anchors // 2, num_classes) \
+                if is_tiny_version else yolo_body(Input(shape=(None, None, 3)), num_anchors // 3, num_classes)
+            self.yolo_model.load_weights(self.model_path)  # make sure model, anchors and classes match
         else:
             assert self.yolo_model.layers[-1].output_shape[-1] == \
-                num_anchors/len(self.yolo_model.output) * (num_classes + 5), \
+                   num_anchors / len(self.yolo_model.output) * (num_classes + 5), \
                 'Mismatch between model and given anchor and class sizes'
 
-        print('{} model, anchors, and classes loaded.'.format(model_path))
+        # print('{} model, anchors, and classes loaded.'.format(model_path))
 
         # Generate colors for drawing bounding boxes.
         hsv_tuples = [(x / len(self.class_names), 1., 1.)
@@ -78,18 +79,18 @@ class YOLO(object):
         random.seed(None)  # Reset seed to default.
 
         # Generate output tensor targets for filtered bounding boxes.
-        self.input_image_shape = K.placeholder(shape=(2, ))
+        self.input_image_shape = K.placeholder(shape=(2,))
         boxes, scores, classes = yolo_eval(self.yolo_model.output, self.anchors,
-                len(self.class_names), self.input_image_shape,
-                score_threshold=self.score, iou_threshold=self.iou)
+                                           len(self.class_names), self.input_image_shape,
+                                           score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    def detect_image(self, image):
+    def detect_image(self, image, draw=True):
         start = timer()
 
         if self.model_image_size != (None, None):
-            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
-            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[0] % 32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1] % 32 == 0, 'Multiples of 32 required'
             boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
         else:
             new_image_size = (image.width - (image.width % 32),
@@ -97,7 +98,7 @@ class YOLO(object):
             boxed_image = letterbox_image(image, new_image_size)
         image_data = np.array(boxed_image, dtype='float32')
 
-        print(image_data.shape)
+        # print(image_data.shape)
         image_data /= 255.
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
 
@@ -109,12 +110,19 @@ class YOLO(object):
                 K.learning_phase(): 0
             })
 
-        print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
+        # print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
+        if draw:
+            self.draw_result(image, out_boxes, out_classes, out_scores)
+
+        end = timer()
+        # print("time: %.02f ms" % (end * 1000 - start * 1000))
+        return image, out_boxes, out_scores, out_classes
+
+    def draw_result(self, image, out_boxes, out_classes, out_scores):
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
-                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+                                  size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = (image.size[0] + image.size[1]) // 300
-
         for i, c in reversed(list(enumerate(out_classes))):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
@@ -129,7 +137,7 @@ class YOLO(object):
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
-            print(label, (left, top), (right, bottom))
+            # print(label, (left, top), (right, bottom))
 
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
@@ -146,10 +154,6 @@ class YOLO(object):
                 fill=self.colors[c])
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
-
-        end = timer()
-        print(end - start)
-        return image
 
     def close_session(self):
         self.sess.close()
@@ -187,7 +191,7 @@ def detect_video(yolo, video_path):
     yolo.close_session()
 
 
-def detect_img(yolo):
+def detect_img_viz(yolo):
     while True:
         img = input('Input image filename:')
         try:
@@ -196,11 +200,10 @@ def detect_img(yolo):
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image(image)
+            r_image, _, _, _ = yolo.detect_image(image)
             r_image.show()
     yolo.close_session()
 
 
-
 if __name__ == '__main__':
-    detect_img(YOLO())
+    detect_img_viz(YOLO())
