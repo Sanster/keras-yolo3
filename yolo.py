@@ -21,7 +21,7 @@ from yolo3.utils import letterbox_image
 
 class YOLO(object):
     def __init__(self):
-        self.model_path = 'model_data/yolo.h5'  # model path or trained weights path
+        self.model_path = 'model_data/yolo.608.h5'  # model path or trained weights path
         self.anchors_path = 'model_data/yolo_anchors.txt'
         self.classes_path = 'model_data/coco_classes.txt'
         self.score = 0.3
@@ -29,7 +29,7 @@ class YOLO(object):
         self.class_names = self._get_class()
         self.anchors = self._get_anchors()
         self.sess = K.get_session()
-        self.model_image_size = (416, 416)  # fixed size or (None, None), hw
+        self.model_image_size = (608, 608)  # fixed size or (None, None), hw
         self.boxes, self.scores, self.classes = self.generate()
 
     def _get_class(self):
@@ -171,7 +171,7 @@ def detect_video(yolo, video_path):
     while True:
         return_value, frame = vid.read()
         image = Image.fromarray(frame)
-        image = yolo.detect_image(image)
+        image, _, _, _ = yolo.detect_image(image)
         result = np.asarray(image)
         curr_time = timer()
         exec_time = curr_time - prev_time

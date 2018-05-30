@@ -67,6 +67,6 @@ if __name__ == '__main__':
 
     yolo.close_session()
 
-    file_path = 'coco/result/detections_{}_kyolov3_results.json'.format(flags.dateset)
+    file_path = 'coco/result/detections_{}_kyolov3_results.json'.format(flags.dataset)
     with open(file_path, 'w') as f:
         json.dump(results, f)
