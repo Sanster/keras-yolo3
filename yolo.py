@@ -21,15 +21,15 @@ from yolo3.utils import letterbox_image
 
 class YOLO(object):
     def __init__(self):
-        self.model_path = 'model_data/yolo.608.h5'  # model path or trained weights path
+        self.model_path = 'model_data/trained_weights_15.h5'  # model path or trained weights path
         self.anchors_path = 'model_data/yolo_anchors.txt'
-        self.classes_path = 'model_data/coco_classes.txt'
+        self.classes_path = 'model_data/coco_classes_plus.txt'
         self.score = 0.3
         self.iou = 0.5
         self.class_names = self._get_class()
         self.anchors = self._get_anchors()
         self.sess = K.get_session()
-        self.model_image_size = (608, 608)  # fixed size or (None, None), hw
+        self.model_image_size = (416, 416)  # fixed size or (None, None), hw
         self.boxes, self.scores, self.classes = self.generate()
 
     def _get_class(self):
@@ -55,6 +55,8 @@ class YOLO(object):
         num_classes = len(self.class_names)
         is_tiny_version = num_anchors == 6  # default setting
         try:
+            print("-"*50)
+            print(model_path)
             self.yolo_model = load_model(model_path, compile=False)
         except:
             self.yolo_model = tiny_yolo_body(Input(shape=(None, None, 3)), num_anchors // 2, num_classes) \

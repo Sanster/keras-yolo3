@@ -8,15 +8,20 @@ import keras.backend as K
 from keras.layers import Input, Lambda
 from keras.models import load_model, Model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
+from keras import optimizers
 
 from yolo3.model import preprocess_true_boxes, yolo_body, tiny_yolo_body, yolo_loss
 from yolo3.utils import get_random_data
+
+TRAIN_EPOCHS = 600
+TRAINABLE_LAYER = 20
+LEARNING_RATE = 0.0001
 
 
 def _main():
     annotation_path = 'train.txt'
     log_dir = 'logs/000/'
-    classes_path = 'model_data/voc_classes.txt'
+    classes_path = 'model_data/coco_classes_plus.txt'
     anchors_path = 'model_data/yolo_anchors.txt'
     class_names = get_classes(classes_path)
     anchors = get_anchors(anchors_path)
@@ -27,20 +32,21 @@ def _main():
     create_func = create_tiny_model if is_tiny_version else create_model
     model = create_func(input_shape, anchors, len(class_names),
                         load_pretrained=True, freeze_body=True)
-
+    model.summary()
     train(model, annotation_path, input_shape, anchors, len(class_names), log_dir=log_dir)
 
 
 def train(model, annotation_path, input_shape, anchors, num_classes, log_dir='logs/'):
     '''retrain/fine-tune the model'''
-    model.compile(optimizer='adam', loss={
-        # use custom yolo_loss Lambda layer.
-        'yolo_loss': lambda y_true, y_pred: y_pred})
+    adam = optimizers.Adam(lr=LEARNING_RATE)
+    # use custom yolo_loss Lambda layer.
+    model.compile(optimizer=adam, loss={'yolo_loss': lambda y_true, y_pred: y_pred})
 
     logging = TensorBoard(log_dir=log_dir)
     checkpoint = ModelCheckpoint(log_dir + "ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5",
-                                 monitor='val_loss', save_weights_only=True, save_best_only=True)
-    early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=5, verbose=1, mode='auto')
+                                 monitor='val_loss', save_weights_only=True, save_best_only=True, period=30)
+
+    early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=50, verbose=1, mode='auto')
 
     batch_size = 32
     val_split = 0.1
@@ -55,10 +61,10 @@ def train(model, annotation_path, input_shape, anchors, num_classes, log_dir='lo
                         validation_data=data_generator_wrap(lines[num_train:], batch_size, input_shape, anchors,
                                                             num_classes),
                         validation_steps=max(1, num_val // batch_size),
-                        epochs=30,
+                        epochs=TRAIN_EPOCHS,
                         initial_epoch=0,
-                        callbacks=[logging, checkpoint, early_stopping])
-    model.save_weights(log_dir + 'trained_weights.h5')
+                        callbacks=[logging, checkpoint])
+    model.save_weights('./model_data/trained_weights_20_layer.h5')
     # Further training.
 
 
@@ -99,7 +105,8 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
         model_body.load_weights(weights_path, by_name=True, skip_mismatch=True)
         if freeze_body:
             # Do not freeze 3 output layers.
-            for i in range(len(model_body.layers) - 3):
+            print("Total layer: %d" % len(model_body.layers))
+            for i in range(len(model_body.layers) - TRAINABLE_LAYER):
                 model_body.layers[i].trainable = False
 
     model_loss = Lambda(yolo_loss, output_shape=(1,), name='yolo_loss',
